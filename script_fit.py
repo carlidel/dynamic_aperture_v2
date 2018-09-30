@@ -14,14 +14,7 @@ from fit_library import *
 
 print("load data")
 
-data = pickle.load(open("radscan_" + 
-                        "dx01_firstonly_manyepsilons_dictionary_v2.pkl", "rb"))
-lin_data = pickle.load(open("linscan_dx01_firstonly_dictionary.pkl", "rb"))
-
-for epsilon in data:
-    item = list(sorted(data[epsilon].keys()))[-1]
-    del data[epsilon][item]
-
+data = pickle.load(open("revised_version_hennon.pkl", "rb"))
 
 # temporary removal of high epsilons for performance:
 #i = 0
@@ -33,21 +26,6 @@ for epsilon in data:
 # end temporary
 
 dx = 0.01
-
-partition_lists = [
-    [0, np.pi / 2]  # Always always keep this one
-    # [x for x in np.linspace(0, np.pi / 2, num=3)],
-    # [x for x in np.linspace(0, np.pi / 2, num=4)],
-    # [x for x in np.linspace(0, np.pi / 2, num=5)],
-    # [x for x in np.linspace(0, np.pi / 2, num=6)],
-    # [x for x in np.linspace(0, np.pi / 2, num=7)],
-    # [x for x in np.linspace(0, np.pi / 2, num=8)],
-    # [x for x in np.linspace(0, np.pi / 2, num=9)],
-    # [x for x in np.linspace(0, np.pi / 2, num=10)],
-    # [x for x in np.linspace(0, np.pi / 2, num=11)],
-    # [x for x in np.linspace(0, np.pi / 2, num=12)],
-    # [x for x in np.linspace(0, np.pi / 2, num=13)]
-]
 
 #%%
 contour_data = {}
@@ -63,63 +41,6 @@ for epsilon in sorted(data):
         dyn_temp[len(partition_list) - 1] = divide_and_compute(
             data[epsilon], n_turns, partition_list)
     dynamic_aperture[epsilon] = dyn_temp
-
-#%%
-print("Fit on Partitions1")
-
-# Search parameters
-k_max = 7.
-k_min = -10.
-dk = 0.02
-
-fit_parameters1 = {}
-best_fit_parameters1 = {}
-
-for epsilon in dynamic_aperture:
-    print(epsilon)
-    # fit1
-    fit_parameters_epsilon = {}
-    best_fit_parameters_epsilon = {}
-
-    for partition_list in partition_lists:
-        fit = {}
-        best = {}
-        for angle in dynamic_aperture[epsilon][len(partition_list) - 1]:
-            fit[angle] = non_linear_fit1(
-                dynamic_aperture[epsilon][len(partition_list) - 1][angle][0],
-                dynamic_aperture[epsilon][len(partition_list) - 1][angle][1],
-                n_turns, k_min, k_max, dk)
-            best[angle] = select_best_fit1(fit[angle])
-        fit_parameters_epsilon[len(partition_list) - 1] = fit
-        best_fit_parameters_epsilon[len(partition_list) - 1] = best
-
-    fit_parameters1[epsilon] = fit_parameters_epsilon
-    best_fit_parameters1[epsilon] = best_fit_parameters_epsilon
-
-#%%
-print("Fit on Partitions1 final")
-
-# Search parameters
-k_lim = 0.1
-dk = 0.0001
-k_bound = 10000
-
-best_fit_parameters1 = {}
-
-for epsilon in dynamic_aperture:
-    print(epsilon)
-    # fit1
-    best_fit_parameters_epsilon = {}
-
-    for partition_list in partition_lists:
-        best = {}
-        for angle in dynamic_aperture[epsilon][len(partition_list) - 1]:
-            best[angle] = non_linear_fit1_final(
-                dynamic_aperture[epsilon][len(partition_list) - 1][angle][0],
-                dynamic_aperture[epsilon][len(partition_list) - 1][angle][1],
-                n_turns, k_lim, dk, k_bound)
-        best_fit_parameters_epsilon[len(partition_list) - 1] = best
-    best_fit_parameters1[epsilon] = best_fit_parameters_epsilon
 
 #%%
 print("Fit1 Iterated")
@@ -151,120 +72,6 @@ for epsilon in dynamic_aperture:
         fit_parameters_epsilon[len(partition_list) - 1] = fit
     best_fit_parameters1[epsilon] = best_fit_parameters_epsilon
     fit_parameters1[epsilon] = fit_parameters_epsilon
-
-#%%
-print("final form of fit2.")
-
-da = 0.0001
-a_max = 0.01
-a_min = (1 / n_turns[0]) + da ### under this value it doesn't converge
-a_bound = n_turns[-1] / a_max
-a_default = n_turns[-1]
-
-fit_parameters2 = {}
-best_fit_parameters2 = {}
-
-for epsilon in dynamic_aperture:
-    print(epsilon)
-    best_fit_parameters_epsilon = {}
-    fit_parameters_epsilon = {}
-    for partition_list in partition_lists:
-        fit = {}
-        best = {}
-        for angle in dynamic_aperture[epsilon][len(partition_list) - 1]:
-            fit[angle], best[angle] = non_linear_fit2_final(
-                dynamic_aperture[epsilon][len(partition_list) - 1][angle][0],
-                dynamic_aperture[epsilon][len(partition_list) - 1][angle][1],
-                n_turns,
-                a_min, a_max, da, a_bound, a_default)
-        fit_parameters_epsilon[len(partition_list) - 1] = fit
-        best_fit_parameters_epsilon[len(partition_list) - 1] = best
-    best_fit_parameters2[epsilon] = best_fit_parameters_epsilon
-    fit_parameters2[epsilon] = fit_parameters_epsilon
-
-#%%
-print("fixed k fit2 naive.")
-k_values = [0.05, 0.1, 0.15, 0.2, 0.25,
-            0.3, 0.33, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1., 1.25]#, 1.5, 2.0, 3.0]
-                                                              # fails from here
-best_fit_parameters2_fixedk_naive = {}
-
-for k in k_values:
-    best_fit_parameters_k = {}
-    for epsilon in dynamic_aperture:
-        best_fit_parameters_epsilon = {}
-        for partition_list in partition_lists:
-            best = {}
-            for angle in dynamic_aperture[epsilon][len(partition_list) - 1]:
-                best[angle] = non_linear_fit2_fixedk_naive(
-                    dynamic_aperture[epsilon][len(partition_list) - 1][angle][0],
-                    dynamic_aperture[epsilon][len(partition_list) - 1][angle][1],
-                    n_turns,
-                    k)
-            best_fit_parameters_epsilon[len(partition_list) - 1] = best
-        best_fit_parameters_k[epsilon] = best_fit_parameters_epsilon
-    best_fit_parameters2_fixedk_naive[k] = best_fit_parameters_k
-
-#%%
-print("fixed k fit2.")
-
-k_values = [0.05, 0.1, 0.15, 0.2, 0.25,
-            0.3, 0.33, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1., 1.25, 1.5, 2.0, 3.0]
-
-da = 0.0001
-a_max = 0.01
-a_min = (1 / n_turns[0]) + da ### under this value it doesn't converge
-a_bound = n_turns[-1] / a_max
-a_default = n_turns[-1]
-
-fit_parameters2_fixedk = {}
-best_fit_parameters2_fixedk = {}
-fit2_fixedk_converged = {}
-
-for k in k_values:
-    fit_parameters_k = {}
-    best_fit_parameters_k = {}
-    converged_k = {}
-    for epsilon in dynamic_aperture:
-        print(k, epsilon)
-        fit_parameters_epsilon = {}
-        best_fit_parameters_epsilon = {}
-        converged_epsilon = {}
-        for partition_list in partition_lists:
-            fit = {}
-            best = {}
-            converged = {}
-            for angle in dynamic_aperture[epsilon][len(partition_list) - 1]:
-                fit[angle], best[angle] = non_linear_fit2_final_fixedk(
-                    dynamic_aperture[epsilon][len(partition_list) - 1][angle][0],
-                    dynamic_aperture[epsilon][len(partition_list) - 1][angle][1],
-                    n_turns,
-                    a_min, a_max, da, a_bound, a_default,
-                    k)
-                converged[angle] = (best[angle][5] != 0)
-            fit_parameters_epsilon[len(partition_list) - 1] = fit
-            best_fit_parameters_epsilon[len(partition_list) - 1] = best
-            converged_epsilon[len(partition_list) - 1] = converged
-        fit_parameters_k[epsilon] = fit_parameters_epsilon
-        best_fit_parameters_k[epsilon] = best_fit_parameters_epsilon
-        converged_k[epsilon] = converged_epsilon
-    fit_parameters2_fixedk[k] = fit_parameters_k
-    best_fit_parameters2_fixedk[k] = best_fit_parameters_k
-    fit2_fixedk_converged[k] = converged_k
-
-#%%
-print("Tell me which 'k' values always converge!")
-k_converged = []
-for k in fit2_fixedk_converged:
-    flag = True
-    for epsilon in fit2_fixedk_converged[k]:
-        for N in fit2_fixedk_converged[k][epsilon]:
-            for angle in fit2_fixedk_converged[k][epsilon][N]:
-                flag = (flag and fit2_fixedk_converged[k][epsilon][N][angle])
-    k_converged.append(flag)
-
-fit2_fixedk_converged_summary = dict(zip(k_values, k_converged))
-print(fit2_fixedk_converged_summary)
 
 #%%
 print("Fit2 DOUBLESCAN on k and a!!!")
@@ -308,41 +115,6 @@ for epsilon in best_fit_parameters1:
                             dynamic_aperture)
 
 #%%
-print("Plot fits from simulation 2.")
-for epsilon in best_fit_parameters2:
-    print(epsilon)
-    #for n_angles in best_fit_parameters1[epsilon]:
-    for N in best_fit_parameters2[epsilon]:
-        for angle in best_fit_parameters2[epsilon][N]:
-            plot_fit_basic2(best_fit_parameters2[epsilon][N][angle],
-                            N, epsilon, angle, n_turns,
-                            dynamic_aperture)
-
-#%%
-print("Plot fits from simulation 2 fixed k NAIVE.")
-for k in best_fit_parameters2_fixedk_naive:
-    for epsilon in best_fit_parameters2_fixedk_naive[k]:
-        print(epsilon)
-        #for n_angles in best_fit_parameters1[epsilon]:
-        for angle in best_fit_parameters2_fixedk_naive[k][epsilon][1]:
-            plot_fit_basic2(
-                best_fit_parameters2_fixedk_naive[k][epsilon][1][angle],
-                1, epsilon, angle, n_turns, dynamic_aperture,
-                "img/fit/fit2_fixk_naive{:.2f}_".format(k))
-
-#%%
-print("Plot fits from simulation 2 fixed k.")
-for k in best_fit_parameters2_fixedk:
-    for epsilon in best_fit_parameters2_fixedk[k]:
-        print(epsilon)
-        #for n_angles in best_fit_parameters1[epsilon]:
-        for angle in best_fit_parameters2_fixedk[k][epsilon][1]:
-            plot_fit_basic2(
-                best_fit_parameters2_fixedk[k][epsilon][1][angle],
-                1, epsilon, angle, n_turns, dynamic_aperture,
-                "img/fit/fit2_fixk{:.2f}_".format(k))
-
-#%%
 print("Plot fits from simulation 2 doublescan")
 for epsilon in best_fit_parameters2_doublescan:
     for angle in best_fit_parameters2_doublescan[epsilon][1]:
@@ -359,31 +131,6 @@ for epsilon in fit_parameters1:
             plot_chi_squared1(fit_parameters1[epsilon][N][angle],
                               epsilon[2], N, angle)
 
-#%%
-print("Compare chi squared fits2.")
-for epsilon in fit_parameters2:
-    for N in fit_parameters2[epsilon]:
-        for angle in fit_parameters2[epsilon][N]:
-            plot_chi_squared2(fit_parameters2[epsilon][N][angle],
-                              epsilon[2], N, angle)
-
-#%%
-print("Compare chi squared fits2 fixed k")
-for epsilon in fit_parameters2_fixedk[0.33]:
-    for N in fit_parameters2_fixedk[0.33][epsilon]:
-        for angle in fit_parameters2_fixedk[0.33][epsilon][N]:
-            plot_chi_squared2(fit_parameters2_fixedk[0.33][epsilon][N][angle],
-                              epsilon[2], N, angle,
-                              "img/fit/fit2_fixk_chisquared")
-
-#%%
-print("Every chi squared fit2 fixed k case")
-for epsilon in fit_parameters2_fixedk[0.33]:
-    for angle in fit_parameters2_fixedk[0.33][epsilon][1]:
-        plot_chi_squared2_multiple(fit_parameters2[epsilon][1][angle],
-                                   fit_parameters2_fixedk, k_values,
-                                   epsilon, 1, angle)
-
 ###############################################################################
 #%%
 print("Fit1 param evolution over epsilon.")
@@ -391,22 +138,6 @@ temp = list(best_fit_parameters1.keys())[0]
 for N in best_fit_parameters1[temp]:
     for angle in (best_fit_parameters1[temp][N]):
         fit_params_over_epsilon1(best_fit_parameters1, N, angle)
-                      
-#%%
-print("Fit2 param evolution over epsilon")
-temp = list(best_fit_parameters2.keys())[0]
-for N in best_fit_parameters2[temp]:
-    for angle in (best_fit_parameters2[temp][N]):
-        fit_params_over_epsilon2(best_fit_parameters2, N, angle,
-                                 titlekind="only scan over $a$")
-
-#%%
-print("Fit2 param evolution over epsilon fixed k")
-temp = list(best_fit_parameters2_fixedk.keys())[0]
-for N in best_fit_parameters2_fixedk[temp]:
-    for angle in (best_fit_parameters2_fixedk[temp][N]):
-        fit_params_over_epsilon2(best_fit_parameters2_fixedk, N, angle,
-                                 "img/fit/f2param_eps_fixedk")
 
 #%%
 print("Fit2 param evolution over epsilon doublescan")
@@ -472,15 +203,6 @@ for N in best_fit_parameters2_doublescan[temp]:
         plot_B_over_k(best_fit_parameters2_doublescan, N, angle,
                       "img/fit/f2param_B_k_doublescan", "doublescan")
 
-#%%
-print("B and k standard")
-temp = list(best_fit_parameters2.keys())[0]
-for N in best_fit_parameters2[temp]:
-    for angle in (best_fit_parameters2[temp][N]):
-        plot_B_over_k(best_fit_parameters2, N, angle,
-                      "img/fit/f2param_B_k_singlescan", "scan only on $a$")
-
-
 ################################################################################
 ################################################################################
 ################################################################################
@@ -540,7 +262,7 @@ for sigma in sigmas:
         for time in n_turns:
             mask = {}
             for angle in data[epsilon]:
-                mask[angle] = [i * dx <= contour_data[epsilon][angle][time] 
+                mask[angle] = [i * dx <= contour_data[epsilon][angle][time]
                                 for i in range(len(data[epsilon][angle]))]
             masked_weights = {}
             for angle in data[epsilon]:
@@ -572,7 +294,7 @@ for sigma in sigmas:
             intensity_evolution = [1.]
             intensity_evolution_min = [1.]
             intensity_evolution_max = [1.]
-            intensity_evolution_err = [0.]   
+            intensity_evolution_err = [0.]
             for time in n_turns:
                 intensity_evolution.append(
                     multiple_partition_intensity(
@@ -601,7 +323,7 @@ for sigma in sigmas:
         loss_D_fit1_sigma[epsilon] = loss_D_fit1_sigma_epsilon
         loss_D_fit1_min_sigma[epsilon] = loss_D_fit1_min_sigma_epsilon
         loss_D_fit1_max_sigma[epsilon] = loss_D_fit1_max_sigma_epsilon
-        loss_D_fit1_err_sigma[epsilon] = loss_D_fit1_err_sigma_epsilon    
+        loss_D_fit1_err_sigma[epsilon] = loss_D_fit1_err_sigma_epsilon
     loss_D_fit1[sigma] = loss_D_fit1_sigma
     loss_D_fit1_min[sigma] = loss_D_fit1_min_sigma
     loss_D_fit1_max[sigma] = loss_D_fit1_max_sigma
@@ -629,26 +351,26 @@ for sigma in sigmas:
             intensity_evolution = [1.]
             intensity_evolution_min = [1.]
             intensity_evolution_max = [1.]
-            intensity_evolution_err = [0.]   
+            intensity_evolution_err = [0.]
             for time in n_turns:
                 intensity_evolution.append(
                     multiple_partition_intensity(
-                        best_fit_parameters2[epsilon][N],
+                        best_fit_parameters2_doublescan[epsilon][N],
                         pass_params_fit2,
                         N, time, sigma))
                 intensity_evolution_min.append(
                     multiple_partition_intensity(
-                        best_fit_parameters2[epsilon][N],
+                        best_fit_parameters2_doublescan[epsilon][N],
                         pass_params_fit2_min,
                         N, time, sigma))
                 intensity_evolution_max.append(
                     multiple_partition_intensity(
-                        best_fit_parameters2[epsilon][N],
+                        best_fit_parameters2_doublescan[epsilon][N],
                         pass_params_fit2_max,
                         N, time, sigma))
                 intensity_evolution_err.append(
                     error_loss_estimation(
-                        best_fit_parameters2[epsilon][N],
+                        best_fit_parameters2_doublescan[epsilon][N],
                         pass_params_fit2, contour_data[epsilon],
                         N, time, sigma))
             loss_D_fit2_sigma_epsilon[N] = np.asarray(intensity_evolution)
@@ -770,12 +492,12 @@ for sigma in loss_all:
     print(sigma)
     fit2_loss_all_sigma = {}
     for epsilon in loss_all[sigma]:
-        _, fit2_loss_all_sigma[epsilon] = non_linear_fit2_final(
+        _, fit2_loss_all_sigma[epsilon] = non_linear_fit2_doublescan(
             dict(zip(n_turns,
                 D_from_loss_all[sigma][epsilon])),
             dict(zip(n_turns,
                 D_from_loss_all[sigma][epsilon] * 0.001)),
-            n_turns, a_min, a_max, da, a_bound, a_default)
+            n_turns, 0.05, 0.01, a_min, a_max, da, a_bound, a_default)
     fit2_loss_all[sigma] = fit2_loss_all_sigma
 
 #%%
@@ -917,12 +639,12 @@ for sigma in loss_mainregion:
     print(sigma)
     fit2_loss_mainregion_sigma = {}
     for epsilon in loss_mainregion[sigma]:
-        _, fit2_loss_mainregion_sigma[epsilon] = non_linear_fit2_final(
+        _, fit2_loss_mainregion_sigma[epsilon] = non_linear_fit2_doublescan(
             dict(zip(n_turns,
                 D_from_loss_mainregion[sigma][epsilon])),
             dict(zip(n_turns,
                 D_from_loss_mainregion[sigma][epsilon] * 0.001)),
-            n_turns, a_min, a_max, da, a_bound, a_default)
+            n_turns, 0.05, 0.01, a_min, a_max, da, a_bound, a_default)
     fit2_loss_mainregion[sigma] = fit2_loss_mainregion_sigma
 
 #%%
@@ -978,7 +700,7 @@ for sigma in sigmas:
     loss_fit2_loss_mainregion_err[sigma] = loss_fit2_loss_mainregion_err_sigma
 
 #%%
-    
+
 print("Plot the losses!")
 
 for sigma in sigmas:
@@ -995,7 +717,7 @@ for sigma in sigmas:
         #     n_turns,
         #     [loss_all[sigma][epsilon], loss_mainregion[sigma][epsilon]],
         #     ["All loss", "Mainregion loss"])
-            
+
         # ### Precise and Precise Fit
         # plot_losses(
         #     ("Comparison of loss measures (all with all FITS),\n" +
@@ -1049,21 +771,21 @@ for sigma in sigmas:
         #     n_turns,
         #     [loss_mainregion[sigma][epsilon]],
         #     ["Mainregion loss"],
-        #     [loss_D_fit1[sigma][epsilon][N] 
-        #         for N in loss_D_fit1[sigma][epsilon]] + 
-        #         [loss_D_fit2[sigma][epsilon][N] 
+        #     [loss_D_fit1[sigma][epsilon][N]
+        #         for N in loss_D_fit1[sigma][epsilon]] +
+        #         [loss_D_fit2[sigma][epsilon][N]
         #         for N in loss_D_fit2[sigma][epsilon]],
-        #     [loss_D_fit1_min[sigma][epsilon][N] 
-        #         for N in loss_D_fit1_min[sigma][epsilon]] + 
-        #         [loss_D_fit2_min[sigma][epsilon][N] 
+        #     [loss_D_fit1_min[sigma][epsilon][N]
+        #         for N in loss_D_fit1_min[sigma][epsilon]] +
+        #         [loss_D_fit2_min[sigma][epsilon][N]
         #         for N in loss_D_fit2_min[sigma][epsilon]],
-        #     [loss_D_fit1_max[sigma][epsilon][N] 
-        #         for N in loss_D_fit1_max[sigma][epsilon]] + 
-        #         [loss_D_fit2_max[sigma][epsilon][N] 
+        #     [loss_D_fit1_max[sigma][epsilon][N]
+        #         for N in loss_D_fit1_max[sigma][epsilon]] +
+        #         [loss_D_fit2_max[sigma][epsilon][N]
         #         for N in loss_D_fit2_max[sigma][epsilon]],
-        #     [loss_D_fit1_err[sigma][epsilon][N] 
-        #         for N in loss_D_fit1_err[sigma][epsilon]] + 
-        #         [loss_D_fit2_err[sigma][epsilon][N] 
+        #     [loss_D_fit1_err[sigma][epsilon][N]
+        #         for N in loss_D_fit1_err[sigma][epsilon]] +
+        #         [loss_D_fit2_err[sigma][epsilon][N]
         #         for N in loss_D_fit2_err[sigma][epsilon]],
         #     ["D loss FIT1, N $= {}$".format(N)
         #         for N in loss_D_fit1[sigma][epsilon]] +
@@ -1150,7 +872,7 @@ for sigma in sigmas:
              n_turns,
              loss_mainregion[sigma][epsilon],
              loss_all[sigma][epsilon],
-             [loss_D_fit1[sigma][epsilon][N] 
+             [loss_D_fit1[sigma][epsilon][N]
                 for N in loss_D_fit1[sigma][epsilon]])
         plot_l2(
             ("$L^2$-norm of difference between mainregion loss\n" +
@@ -1161,10 +883,10 @@ for sigma in sigmas:
              n_turns,
              loss_mainregion[sigma][epsilon],
              loss_all[sigma][epsilon],
-             [loss_D_fit2[sigma][epsilon][N] 
+             [loss_D_fit2[sigma][epsilon][N]
                 for N in loss_D_fit2[sigma][epsilon]])
 
-        
+
 ################################################################################
 ################################################################################
 ################################################################################
@@ -1183,90 +905,6 @@ from fit_library import *
 print("LHC data.")
 lhc_data = pickle.load(open("LHC_DATA.pkl", "rb"))
 lhc_data = remove_first_times_lhc(lhc_data, 1000)
-
-#%%
-print("compute fits1")
-
-fit_lhc1 = {}
-best_fit_lhc1 = {}
-
-for label in lhc_data:
-    fit_lhc1_label = {}
-    best_fit_lhc1_label = {}
-    for i in lhc_data[label]:
-        j = 0
-        print(label, i)
-        fit_lhc1_correction = []
-        best_fit_lhc1_correction = []
-        for seed in lhc_data[label][i]:
-            print(j)
-            j += 1
-            # FIT1
-            fit_lhc1_correction.append(
-                                non_linear_fit1(seed,
-                                                sigma_filler(seed, 0.05),
-                                                np.asarray(sorted(seed.keys())),
-                                                k_min,
-                                                k_max,
-                                                dk))
-            best_fit_lhc1_correction.append(
-                                select_best_fit1(fit_lhc1_correction[-1]))
-
-        fit_lhc1_label[i] = fit_lhc1_correction
-        best_fit_lhc1_label[i] = best_fit_lhc1_correction
-    fit_lhc1[label] = fit_lhc1_label
-    best_fit_lhc1[label] = best_fit_lhc1_label
-
-#%%
-print("compute fits2")
-
-fit_lhc2 = {}
-best_fit_lhc2 = {}
-
-for label in lhc_data:
-    fit_lhc2_label = {}
-    best_fit_lhc2_label = {}
-    for i in lhc_data[label]:
-        j = 0
-        print(label, i)
-        fit_lhc2_correction = []
-        best_fit_lhc2_correction = []
-        for seed in lhc_data[label][i]:
-            print(j)
-            j += 1
-            scale_search = 1.
-            # FIT2
-            fit_lhc2_correction.append(
-                                non_linear_fit2(seed,
-                                                sigma_filler(seed, 0.05),
-                                                np.asarray(sorted(seed.keys())),
-                                                A_min,
-                                                A_max,
-                                                dA))
-            best_fit_lhc2_correction.append(
-                                select_best_fit2(fit_lhc2_correction[-1]))
-            ### Is this a naive minimum in the chi squared?
-            while (best_fit_lhc2_correction[-1][4] >= (A_max * scale_search 
-                    - dA * scale_search) and scale_search <= 1e20):
-                print("Minimum naive! Increase scale_search!")
-                A_min_new = A_max * scale_search
-                scale_search *= 10.
-                if scale_search > 1e20:
-                    print("Maximum scale reached! This will be the last fit.")
-                print(scale_search)
-                fit_lhc2_correction[-1] = non_linear_fit2(
-                                                seed,
-                                                sigma_filler(seed, 0.05),
-                                                np.asarray(sorted(seed.keys())),
-                                                A_min_new,
-                                                A_max * scale_search,
-                                                dA * scale_search)
-                best_fit_lhc2_correction[-1] = select_best_fit2(
-                                                fit_lhc2_correction[-1])
-        fit_lhc2_label[i] = fit_lhc2_correction
-        best_fit_lhc2_label[i] = best_fit_lhc2_correction
-    fit_lhc2[label] = fit_lhc2_label
-    best_fit_lhc2[label] = best_fit_lhc2_label
 
 #%%
 print("Compute FIT1 Final Version")
@@ -1303,85 +941,6 @@ for label in lhc_data:
         best_fit_lhc1_label[i] = best_fit_lhc1_correction
     fit_lhc1[label] = fit_lhc1_label
     best_fit_lhc1[label] = best_fit_lhc1_label
-
-#%%
-print("Compute FIT2 Final Version")
-
-da = 0.001
-a_max = 0.1
-a_bound = 1e10
-
-fit_lhc2 = {}
-best_fit_lhc2 = {}
-
-for label in lhc_data:
-    fit_lhc2_label = {}
-    best_fit_lhc2_label = {}
-    for i in lhc_data[label]:
-        j = 0
-        print(label, i)
-        fit_lhc2_correction = []
-        best_fit_lhc2_correction = []
-        for seed in lhc_data[label][i]:
-            print(j)
-            j += 1
-            a_default = np.asarray(sorted(seed.keys()))[-1]
-            a_min = (1/np.asarray(sorted(seed.keys()))[0]) + da
-            fit, best = non_linear_fit2_final(
-                            seed,
-                            sigma_filler(seed, 0.05),
-                            np.asarray(sorted(seed.keys())),
-                            a_min, a_max, da, a_bound, a_default)
-            fit_lhc2_correction.append(fit)
-            best_fit_lhc2_correction.append(best)
-        fit_lhc2_label[i] = fit_lhc2_correction
-        best_fit_lhc2_label[i] = best_fit_lhc2_correction
-    fit_lhc2[label] = fit_lhc2_label
-    best_fit_lhc2[label] = best_fit_lhc2_label
-
-#%%
-print("Compute FIT2 fixed k")
-
-k_values = [0.1, 0.33, 0.5, 0.7, 1]
-
-da = 0.001
-a_max = 0.1
-a_bound = 1e10
-
-fit_lhc2_fixedk = {}
-best_fit_lhc2_fixedk = {}
-
-for k in k_values:
-    print(k)
-    fit_lhc2_fixedk_k = {}
-    best_fit_lhc2_fixedk_k = {}
-    for label in lhc_data:
-        fit_lhc2_fixedk_label = {}
-        best_fit_lhc2_fixedk_label = {}
-        for i in lhc_data[label]:
-            j = 0
-            print(k, label, i)
-            fit_lhc2_fixedk_correction = []
-            best_fit_lhc2_fixedk_correction = []
-            for seed in lhc_data[label][i]:
-                print(j)
-                j += 1
-                a_default = np.asarray(sorted(seed.keys()))[-1]
-                a_min = (1/np.asarray(sorted(seed.keys()))[0]) + da
-                fit, best = non_linear_fit2_final_fixedk(
-                                seed,
-                                sigma_filler(seed, 0.05),
-                                np.asarray(sorted(seed.keys())),
-                                a_min, a_max, da, a_bound, a_default,
-                                k)
-                fit_lhc2_fixedk_correction.append(fit)
-                best_fit_lhc2_fixedk_correction.append(best)
-            fit_lhc2_fixedk_label[i] = fit_lhc2_fixedk_correction
-            best_fit_lhc2_fixedk_label[i] = best_fit_lhc2_fixedk_correction
-        fit_lhc2_fixedk_k[label] = fit_lhc2_fixedk_label
-        best_fit_lhc2_fixedk_k[label] = best_fit_lhc2_fixedk_label
-    fit_lhc2_fixedk[k] = fit_lhc2_fixedk_k
-    best_fit_lhc2_fixedk[k] = best_fit_lhc2_fixedk_k
 
 #%%
 print("Compute FIT2 doublescan")
@@ -1425,24 +984,9 @@ for label in lhc_data:
 #%%
 print("Save fit")
 
-fit_lhc = (fit_lhc1, fit_lhc2, fit_lhc2_fixedk, fit_lhc2_doublescan,
-           best_fit_lhc1, best_fit_lhc2, best_fit_lhc2_fixedk,
-           best_fit_lhc2_doublescan)
-with open("LHC_FIT.pkl", "wb") as f:
-    pickle.dump(fit_lhc, f, pickle.HIGHEST_PROTOCOL)
-
-#%%
-print("Load fit (if already done).")
-
-fit_lhc = pickle.load(open("LHC_FIT.pkl", "rb"))
-fit_lhc1 = fit_lhc[0]
-fit_lhc2 = fit_lhc[1]
-fit_lhc2_fixedk = fit_lhc[2]
-fit_lhc2_doublescan = fit_lhc[3]
-best_fit_lhc1 = fit_lhc[4]
-best_fit_lhc2 = fit_lhc[5]
-best_fit_lhc2_fixedk = fit_lhc[6]
-best_fit_lhc2_doublescan = fit_lhc[7]
+print("I mean, you probably should.")
+print("It depends on how much time it will take on your machine")
+print("At a certain point, I was mainly using the ram saving feature on Spyder")
 
 #%%
 print("Is fit1 positive? Is fit2 bounded in a?")
@@ -1473,7 +1017,7 @@ for folder in fit1_lhc_pos:
                 print("DID NOT WORK FOR {}-{}".format(folder, kind))
                 flag = False
 print(flag)
-    
+
 #%%
 
 print("general lhc plots.")
@@ -1556,7 +1100,7 @@ print("reverse engeneering D from intensity")
 nek_D = {}
 for label in nek_data:
     nek_D[label] = (nek_data[label][0],
-                    D_from_loss(nek_data[label][1], 1)) 
+                    D_from_loss(nek_data[label][1], 1))
 
 #%%
 print("fit1")
@@ -1580,7 +1124,7 @@ for label in nek_D:
 print("plot the things1")
 
 for label in nek_fit1:
-    plot_fit_nek1(nek_fit1[label], label, 
+    plot_fit_nek1(nek_fit1[label], label,
                   nek_D[label][0],
                   dict(zip(nek_D[label][0], nek_D[label][1])),
                   dict(zip(nek_D[label][0], nek_D[label][1] * 0.001)))
@@ -1598,53 +1142,27 @@ nek_fit2 = {}
 for label in nek_D:
     print(label)
     a_default = nek_D[label][0][-1]
-    _, nek_fit2[label] = non_linear_fit2_final(
+    _, nek_fit2[label] = non_linear_fit2_doublescan(
             dict(zip(nek_D[label][0], nek_D[label][1])),
             dict(zip(nek_D[label][0], nek_D[label][1] * 0.001)),
             nek_D[label][0],
+            0.05, 0.01,
             a_min, a_max, da, a_bound, a_default)
-    
+
 #%%
 print("plot the things2")
 
 for label in nek_fit2:
-    plot_fit_nek2(nek_fit2[label], label, 
+    plot_fit_nek2(nek_fit2[label], label,
                   nek_D[label][0],
                   dict(zip(nek_D[label][0], nek_D[label][1])),
                   dict(zip(nek_D[label][0], nek_D[label][1] * 0.001)),
                   imgpath="img/nek/fit2_standard_")
-    plot_fit_nek2(nek_fit2[label], label, 
+    plot_fit_nek2(nek_fit2[label], label,
                   nek_D[label][0],
                   dict(zip(nek_D[label][0], nek_D[label][1])),
                   dict(zip(nek_D[label][0], nek_D[label][1] * 0.001)),
                   "img/nek/fit2_standard_log_", True)
-
-#%%
-print("what if... fit2")
-
-nek_fit2 = {}
-for label in nek_D:
-    print(label)
-    nek_fit2[label] = non_linear_fit2_fixedk(
-            dict(zip(nek_D[label][0], nek_D[label][1])),
-            dict(zip(nek_D[label][0], nek_D[label][1] * 0.001)),
-            nek_D[label][0],
-            0, 100000000)
-
-#%%
-print("plot the things2")
-
-for label in nek_fit2:
-    plot_fit_nek2(nek_fit2[label], label, 
-                  nek_D[label][0],
-                  dict(zip(nek_D[label][0], nek_D[label][1])),
-                  dict(zip(nek_D[label][0], nek_D[label][1] * 0.001)),
-                  imgpath="img/nek/fit2_fixedk_")
-    plot_fit_nek2(nek_fit2[label], label, 
-                  nek_D[label][0],
-                  dict(zip(nek_D[label][0], nek_D[label][1])),
-                  dict(zip(nek_D[label][0], nek_D[label][1] * 0.001)),
-                  "img/nek/fit2_fixedk_log_", True)
 
 #%%
 print("combine!")
@@ -1694,6 +1212,6 @@ for epsilon in data:
     fig.savefig("img/stabmap_eps{:2.0f}_N{}.png".format(epsilon[2], level), dpi = DPI)
     plt.close()
 #%%
-from png_to_jpg import *
+from png_to_jpg import png_to_jpg
 
 png_to_jpg("img/")

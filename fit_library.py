@@ -23,7 +23,8 @@ n_scanned_angles = 101
 angles = np.linspace(0, np.pi / 2, n_scanned_angles + 1)
 dtheta = angles[1] - angles[0]
 
-# Scanned N_turns
+# Scanned N_turns, here we define at which number of turns we are going to
+# "see what happened with the beam"
 
 n_turns = np.array([
     1000, 1200, 1400, 1600, 1800, 2000, 2500, 3000, 3500, 4000, 4500, 5000,
@@ -37,7 +38,11 @@ n_turns = np.array([
     7000000, 7500000, 8000000, 8500000, 9000000, 9500000, 10000000
 ])
 
-# Partition list for basic angle partitioning
+# Partition lists for basic angle partitioning, since we will want to check for
+# different angle partitions, here we list how deep we want to go.
+# if we want to neglect this analysis, keep only the first line and comment the
+# others.
+
 partition_lists = [
     [0, np.pi / 2],  # Always always keep this one
     [x for x in np.linspace(0, np.pi / 2, num=3)],
@@ -53,7 +58,7 @@ partition_lists = [
     [x for x in np.linspace(0, np.pi / 2, num=13)]
 ]
 
-
+# Not perfect, needs improvement for proper scientific notation!
 def error_formatter(meas, err):
     err *= 1.0001
     mag = np.absolute(int(np.log10(err)) - 1)
@@ -68,7 +73,7 @@ def error_formatter(meas, err):
 
 def compute_D(contour_data, section_lenght, d_angle=dtheta):
     '''
-    Given a list of distances from an angular scan
+    Given an array of distances from an angular scan
     and the total lenght of the section.
     Returns the defined Dynamic Aperture
     '''
@@ -78,7 +83,7 @@ def compute_D(contour_data, section_lenght, d_angle=dtheta):
 
 def compute_D_error(contour_data, d_lenght=dx, d_angle=dtheta):
     '''
-    Given the list of distances from an angular scan,
+    Given the array of distances from an angular scan,
     computes the error estimation
     '''
     first_derivatives = np.asarray(
@@ -147,8 +152,13 @@ def divide_and_compute(data,
 
 
 def FIT1(x, D_inf, B, k):
+    """
+    The first fitting formula used in the first papers.
+    """
     return D_inf + B / np.exp(k * np.log(np.log(x)))
 
+# I needed something here for drawing the error band for the fit parameters.
+# this is an easy and lazy solution.
 
 def FIT1_error_max(x, D_inf, D_inf_err, B, B_err, k, k_err):
     #print(D_inf, D_inf_err, B, B_err, k, k_err)
@@ -167,9 +177,21 @@ def FIT1_error_min(x, D_inf, D_inf_err, B, B_err, k, k_err):
 
 
 def non_linear_fit1(data, err_data, n_turns, k_min, k_max, dk, p0D=0, p0B=0):
+    """
+    Data is a dictionary in the form 
+    data[number_of_turns] = current_dynamic_aperture,
+    Err_data is a dictionary in the same form,
+    n_turns is the list of scanned number of turns,
+    k_min and k_max is the interval of exploration,
+    dk is the scanning step,
+    last two are just the starting points for the fit.
+    """
+    # I sadly have to redefine the fit function here for using curve_fit
+    # properly, really unelegant.
     fit1 = lambda x, D_inf, B: D_inf + B / np.log(x)**k
     chi1 = lambda x, y, sigma, popt: ((1 / (len(n_turns) - 3)) *
                         np.sum(((y - fit1(x, popt[0], popt[1])) / sigma)**2))
+    # we want to perform a scan for the different k values.
     explore_k = {}
     for number in np.arange(k_min, k_max + dk, dk):
         if np.absolute(number) > dk / 10.:
@@ -193,49 +215,6 @@ def non_linear_fit1(data, err_data, n_turns, k_min, k_max, dk, p0D=0, p0B=0):
     return explore_k
 
 
-def non_linear_fit1_final(data, err_data, n_turns,
-                          k_lim, dk, k_bound, p0D=0, p0B=0):
-    scale_search = 1.
-    #print(scale_search)
-    best_fit = select_best_fit1(non_linear_fit1(
-        data, err_data, n_turns,
-        -k_lim, k_lim, dk, p0D, p0B))
-    # is upper bound
-    if best_fit[4] > k_lim - dk:
-        while (best_fit[4] > (k_lim - dk) * scale_search and
-               scale_search < k_bound):
-            scale_search *= 10.
-            #print(scale_search)
-            best_fit = select_best_fit1(non_linear_fit1(
-                data, err_data, n_turns, -k_lim,
-                k_lim * scale_search, dk * scale_search,
-                p0D, p0B))
-    # is lower bound
-    elif best_fit[4] < -k_lim + dk:
-        while (best_fit[4] < (-k_lim + dk) * scale_search and
-               scale_search < k_bound):
-            scale_search *= 10.
-            #print(scale_search)
-            best_fit = select_best_fit1(non_linear_fit1(
-                data, err_data, n_turns,
-                -k_lim * scale_search, k_lim,
-                dk * scale_search, p0D, p0B))
-    return best_fit
-
-
-def non_linear_fit1_iterated(data, err_data, n_turns,
-                             k_min, k_max, dk, n_iterations, p0D=0, p0B=0):
-    all_fits = non_linear_fit1(data, err_data, n_turns,
-                               k_min, k_max, dk, p0D, p0B)
-    best_fit = select_best_fit1(all_fits)
-    for i in range(n_iterations):
-        best_fit = select_best_fit1(non_linear_fit1(
-            data, err_data, n_turns,
-            best_fit[4] - dk, best_fit[4] + dk, dk / 10, p0D, p0B))
-        dk /= 10
-    return all_fits, best_fit
-
-
 def select_best_fit1(parameters):
     """
     Selects the best fit parameters by choosing the minimum chi-squared value.
@@ -249,6 +228,27 @@ def select_best_fit1(parameters):
             best[1][3])
 
 
+def non_linear_fit1_iterated(data, err_data, n_turns,
+                             k_min, k_max, dk, n_iterations, p0D=0, p0B=0):
+    """
+    With this method, we can refine the analysis on the k parameter in a smart
+    way. Look on the report for more details.
+    Signature is almost the same of non_linear_fit1 but we have now n_iterations
+    to regulate.
+    """
+    all_fits = non_linear_fit1(data, err_data, n_turns,
+                               k_min, k_max, dk, p0D, p0B)
+    best_fit = select_best_fit1(all_fits)
+    for i in range(n_iterations):
+        best_fit = select_best_fit1(non_linear_fit1(
+            data, err_data, n_turns,
+            best_fit[4] - dk, best_fit[4] + dk, dk / 10, p0D, p0B))
+        dk /= 10
+    return all_fits, best_fit
+
+
+# Some useful functions for plotting the fit curve by
+# passing the parameters
 def pass_params_fit1(x, params):
     return FIT1(x, params[0], params[2], params[4])
 
@@ -275,10 +275,12 @@ def FIT2(x, a, b, k):
     return b / np.exp(k * np.log(np.log(a * x)))
 
 
+# Look in the report for more details about this alternative form
 def FIT2_linearized(x, k, B, a): # b = exp(B); a = exp(A)
     return np.exp(B - k * np.log(np.log(a * np.asarray(x))))
 
 
+# Same as Fit1
 def FIT2_linearized_err_max(x, k, k_err, B, B_err, a, a_err):
     return FIT2_linearized(x, k - k_err, B + B_err, a - a_err)
 
@@ -286,28 +288,9 @@ def FIT2_linearized_err_max(x, k, k_err, B, B_err, a, a_err):
 def FIT2_linearized_err_min(x, k, k_err, B, B_err, a, a_err):
     return FIT2_linearized(x, k + k_err, B - B_err, a + a_err)
 
-
-def non_linear_fit2_fixed_a(data, err_data, n_turns, a, da, p0k=0, p0B=0):
-    fit2 = lambda x, k, B: B - k * np.log(np.log(float(a) * x))
-    chi2 = lambda x, y, sigma, popt: ((1 / (len(n_turns) - 2)) *
-                        np.sum(((y - fit2(x, popt[0], popt[1])) / sigma)**2))
-    working_data = {}
-    working_err_data = {}
-    # Preprocessing the data
-    for label in data:
-        working_data[label] = np.log(np.copy(data[label]))
-        working_err_data[label] = ((1 / np.copy(data[label])) * 
-                                            np.copy(err_data[label]))
-    popt, pcov = curve_fit(fit2,
-                           n_turns, [working_data[i] for i in n_turns],
-                           p0=[p0k, p0B],
-                           sigma=[working_err_data[i] for i in n_turns])
-    return(popt[0], np.sqrt(pcov[0][0]),
-           popt[1], np.sqrt(pcov[1][1]),
-           a, da,
-           chi2(n_turns, [working_data[i] for i in n_turns],
-                [working_err_data[i] for i in n_turns], popt))
-
+# This is mostly based on the same mentality of FIT1 fitting procedure,
+# but because of many various analysis and different attempts, now it's
+# indeed quite a messy spaghetti code.
 
 def non_linear_fit2_fixed_a_and_k(data, err_data, n_turns, a, k, k_err=0., p0B=0.):
     fit2 = lambda x, B: B - k * np.log(np.log(float(a) * x))
@@ -330,40 +313,6 @@ def non_linear_fit2_fixed_a_and_k(data, err_data, n_turns, a, k, k_err=0., p0B=0
            chi2(n_turns, [working_data[i] for i in n_turns],
                 [working_err_data[i] for i in n_turns], popt))
             
-
-def non_linear_fit2(data, err_data, n_turns, a_min, a_max, da, p0k=0, p0B=0):
-    fit2 = lambda x, k, B: B - k * np.log(np.log(a * x))
-    chi2 = lambda x, y, sigma, popt: ((1 / (len(n_turns) - 3)) *
-                        np.sum(((y - fit2(x, popt[0], popt[1])) / sigma)**2))
-    explore_a = {}
-
-    working_data = {}
-    working_err_data = {}
-    # Preprocessing the data
-    for label in data:
-        working_data[label] = np.log(np.copy(data[label]))
-        working_err_data[label] = ((1 / np.copy(data[label])) * 
-                                            np.copy(err_data[label]))
-
-    for number in np.arange(a_min, a_max + da, da):
-        a = number
-        try:
-            popt, pcov = curve_fit(fit2,
-                                   n_turns, [working_data[i] for i in n_turns],
-                                   p0=[p0k, p0B],
-                                   sigma=[working_err_data[i] for i in n_turns])
-            explore_a[a] = (popt, 
-                            pcov,
-                            chi2(n_turns,
-                                 [working_data[i] for i in n_turns],
-                                 [working_err_data[i] for i in n_turns], 
-                                 popt), 
-                            da)
-        except RuntimeError:
-            print("Runtime error with a = {}".format(a))
-    assert len(explore_a) > 0
-    return explore_a
-
 
 def non_linear_fit2_fixedk(data, err_data, n_turns, a_min, a_max, da, k, p0B=0):
     fit2 = lambda x, B: B - k * np.log(np.log(a * x))
@@ -400,29 +349,6 @@ def non_linear_fit2_fixedk(data, err_data, n_turns, a_min, a_max, da, k, p0B=0):
     return explore_a
 
 
-def non_linear_fit2_final(data, err_data, n_turns,
-                          a_min, a_max, da, a_bound, a_default, p0k=0, p0B=0):
-    scale_search = 1
-    #print(scale_search)
-    all_fits = non_linear_fit2(data, err_data, n_turns,
-                               a_min, a_max, da, p0k, p0B)
-    best_fit = select_best_fit2(all_fits)
-    while (best_fit[4] >= a_max * scale_search - da * scale_search and
-                          scale_search <= a_bound):
-        scale_search *= 10
-        #print(scale_search)
-        if scale_search > a_bound:
-            print("Set a = {}".format(a_default))
-            return all_fits, non_linear_fit2_fixed_a(data, err_data, n_turns,
-                                           float(a_default), 0.,
-                                           p0k, p0B)
-        all_fits = non_linear_fit2(data, err_data, n_turns,
-                                   a_min, a_max * scale_search,
-                                   da * scale_search, p0k, p0B)
-        best_fit = select_best_fit2(all_fits)
-    return all_fits, best_fit
-
-
 def non_linear_fit2_final_fixedk(data, err_data, n_turns,
                                  a_min, a_max, da, a_bound, a_default,
                                  k, k_err=0., p0B=0.):
@@ -447,34 +373,7 @@ def non_linear_fit2_final_fixedk(data, err_data, n_turns,
     return all_fits, best_fit
 
 
-def non_linear_fit2_fixedk_naive(data, err_data, n_turns, k, p0B=1., p0a=1.):
-    fit2 = lambda x, B, a: B - k * np.log(np.log(float(a)*x))
-    working_data = {}
-    working_err_data = {}
-    # Preprocessing the data
-    for label in data:
-        working_data[label] = np.log(np.copy(data[label]))
-        working_err_data[label] = ((1 / np.copy(data[label])) *
-                                            np.copy(err_data[label]))
-    try:
-        popt, pcov = curve_fit(fit2,
-                               n_turns,
-                               [working_data[i] for i in n_turns],
-                               p0=[p0B, p0a],
-                               sigma=[working_err_data[i] for i in n_turns],
-                               bounds=([-np.inf, 1 / n_turns[0]],
-                                       [np.inf, np.inf]))
-        return (k,
-                0.,
-                popt[0],
-                np.sqrt(pcov[0][0]),
-                popt[1],
-                np.sqrt(pcov[1][1]))
-    except RuntimeError:
-        print("FAIL", k)
-        return(0., 0., 0., 0., 0., 0.)
-
-
+# At the end of the day, we use this one.
 def non_linear_fit2_doublescan(data, err_data, n_turns,
                                k_min, dk, a_min, a_max, da, a_bound, a_default):
     best_fit_list = []
@@ -545,6 +444,8 @@ def pass_params_fit2_max(x, params):
 ##  PLOTTING FUNCTIONS  ########################################################
 ################################################################################
 ################################################################################
+
+# This is just stuff for plotting stuff, nothing special, very boring.
 
 def plot_fit_basic1(fit_params, N, epsilon, angle, n_turns, dynamic_aperture,
                     imgpath="img/fit/fit1"):
@@ -1090,12 +991,17 @@ def plot_B_over_k(fit_params_dict, n_partitions=1, angle=np.pi / 4,
 ################################################################################
 ################################################################################
 
+# Here stuff becomes more heavy...
+
 # Sigmas for gaussian distribution to explore
 sigmas = [0.2, 0.25, 0.5, 0.75, 1]
 
 # Functions
 
 def intensity_zero_gaussian(x, y, sigma_x, sigma_y):
+    """
+    I_0 distribution as a 2D gaussian
+    """
     return (1 / (2 * np.pi * sigma_x * sigma_y)) * np.exp(-(
         (x**2 / (2 * sigma_x**2)) + (y**2 / (2 * sigma_y**2))))
 
@@ -1109,6 +1015,7 @@ def D_from_loss(loss, sigma=1):  # INVERSE FORMULA
 
 
 def loss_from_anglescan(contour, time, sigma=1):
+    # Inelegant, but works
     dtheta = sorted(contour)[1] - sorted(contour)[0]
     return (2 / np.pi) * integrate.trapz(
         [
@@ -1423,12 +1330,18 @@ def remove_first_times_lhc(data, lower_bound):
 
 
 def sigma_filler(data_dict, perc):
+    """
+    We need the error estimation on the data for performing the fits,
+    this thing allows us to put in there an estimation for the
+    error percentage and use the resulting error data in the fit
+    """
     sigma_dict = {}
     for element in data_dict:
         sigma_dict[element] = data_dict[element] * perc
     return sigma_dict
 
-
+# I was using this when I wanted to distinguish particular combination of cases
+# now it's basically deactivated, as soon as I can I will work to remove it.
 def lambda_color(fit1_selected, fit2_decent):
     if not (fit1_selected ^ fit2_decent):
         return "g--"
@@ -1939,5 +1852,3 @@ def combine_image_6x2(imgname, path1, path2="none", path3="none", path4="none",
     row2 = np.concatenate((img7, img8, img9, img10, img11, img12), axis=1)
     image = np.concatenate((row1, row2), axis=0)
     cv2.imwrite(imgname, image)
-
-print("culoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculoculo")
